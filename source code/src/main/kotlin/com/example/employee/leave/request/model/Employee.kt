@@ -5,6 +5,5 @@ data class Employee(
     val firstName: String,
     val lastName: String,
     val email: String,
-    val leaderId: Int?,
-    val leaveQuotas: Int
+    val leaderId: Int?
 )

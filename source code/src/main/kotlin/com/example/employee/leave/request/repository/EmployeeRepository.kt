@@ -24,8 +24,7 @@ class EmployeeRepository(
                     row.get("first_name") as String,
                     row.get("last_name") as String,
                     row.get("email") as String,
-                    row.get("leader_id") as? Int,
-                    row.get("quotas") as Int
+                    row.get("leader_id") as? Int
                 )
             }
             .awaitOneOrNull()
