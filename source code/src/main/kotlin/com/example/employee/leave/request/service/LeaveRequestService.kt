@@ -5,13 +5,17 @@ import com.example.employee.leave.request.exception.*
 import com.example.employee.leave.request.model.LeaveRequest
 import com.example.employee.leave.request.repository.LeaveRequestRepository
 import com.example.employee.leave.request.utils.getCurrentDate
+import com.example.employee.leave.request.utils.observeSuspend
+import io.micrometer.observation.Observation
+import io.micrometer.observation.ObservationRegistry
 import org.springframework.stereotype.Service
 import java.time.Period
 
 @Service
 class LeaveRequestService(
     private val repository: LeaveRequestRepository,
-    private val employeeService: EmployeeService
+    private val employeeService: EmployeeService,
+    private val observationRegistry: ObservationRegistry
 ) {
     suspend fun getLeaveTypes(): List<LeaveRequest.Type> {
         return repository.getLeaveTypes()
@@ -44,14 +48,18 @@ class LeaveRequestService(
     }
 
     suspend fun submitRequest(request: LeaveRequestDto) {
-        val quotas = getQuotas(request.employeeId)
-        val durationInDays = Period.between(request.startDate, request.endDate).days
-        val remainingQuotas = quotas - durationInDays
+        val observation = Observation.createNotStarted("submit_leave_request", observationRegistry)
 
-        if(remainingQuotas < 0) throw InsufficientQuotasException()
-        else repository.updateQuotas(request.employeeId, remainingQuotas)
+        observation.observeSuspend {
+            val quotas = getQuotas(request.employeeId)
+            val durationInDays = Period.between(request.startDate, request.endDate).days
+            val remainingQuotas = quotas - durationInDays
 
-        repository.submitLeaveRequest(request.toLeaveRequest(3))
+            if(remainingQuotas < 0) throw InsufficientQuotasException()
+            else repository.updateQuotas(request.employeeId, remainingQuotas)
+
+            repository.submitLeaveRequest(request.toLeaveRequest(3))
+        }
     }
 
     suspend fun cancelRequest(request: CancelLeaveRequestDto) {
@@ -61,15 +69,19 @@ class LeaveRequestService(
     }
 
     suspend fun requestApproval(request: RequestApprovalDto) {
-        val employee = employeeService.getEmployee(request.approverId)
+        val observation = Observation.createNotStarted("leave_request_approval", observationRegistry)
 
-        if(employee.leaderId != null) throw NotAuthorizedException()
+        observation.observeSuspend {
+            val employee = employeeService.getEmployee(request.approverId)
 
-        val leaveRequest = getRequest(request.requestId)
-        val status = if(request.approved) 1 else 2
+            if(employee.leaderId != null) throw NotAuthorizedException()
 
-        if(leaveRequest.status == 3) repository.updateRequestStatus(leaveRequest.id!!, leaveRequest.employee, status)
-        else throw ApprovalException("Failed to approve. Request not pending")
+            val leaveRequest = getRequest(request.requestId)
+            val status = if(request.approved) 1 else 2
+
+            if(leaveRequest.status == 3) repository.updateRequestStatus(leaveRequest.id!!, leaveRequest.employee, status)
+            else throw ApprovalException("Failed to approve. Request not pending")
+        }
     }
 
     private fun LeaveRequestDto.toLeaveRequest(status: Int): LeaveRequest {
