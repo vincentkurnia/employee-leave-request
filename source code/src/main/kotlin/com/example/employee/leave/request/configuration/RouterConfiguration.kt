@@ -15,19 +15,17 @@ class RouterConfiguration {
 
             "/leave".nest {
                 "/request".nest {
-                    POST("")
-                    POST("/cancel")
-                    GET("/pending")
-                    GET("/approved")
+                    POST("", leaveRequestHandler::submitRequest)
+                    POST("/cancel", leaveRequestHandler::cancelRequest)
+                    GET("", leaveRequestHandler::getRequest)
                 }
                 "/approval".nest {
-                    POST("")
-                    GET("/pending")
-                    GET("/approved")
+                    POST("", leaveRequestHandler::requestApproval)
+                    GET("", leaveRequestHandler::getRequestForApprover)
                 }
-                GET("/quotas/{id}")
-                GET("/types")
-                GET("/statuses")
+                GET("/quotas/{id}", leaveRequestHandler::getQuotas)
+                GET("/types", leaveRequestHandler::getLeaveTypes)
+                GET("/statuses", leaveRequestHandler::getLeaveRequestStatuses)
             }
         }
     }
